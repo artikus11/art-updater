@@ -176,6 +176,8 @@ new PluginUpdater(
 
 Пакет: `art/updater`. PHP `>=8.3`. Подключается как VCS dependency, Packagist не обязателен.
 
+Все константы библиотеки (имена `define` с префиксом `AUP_`, `METADATA_ASSET`, GitHub API, кеш, коды ошибок) живут в `Art\Updater\Config`.
+
 Каждый плагин получает библиотеку через Composer и при сборке runner выполняет:
 
 ```bash
@@ -190,16 +192,16 @@ composer install --no-dev --optimize-autoloader
 на уровне сайта.
 
 ```php
-define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
-define( 'ART_UPDATER_GITHUB_REPOSITORY', 'owner/repo' );
-define( 'ART_UPDATER_GITHUB_RELEASE_TAG', 'skl-plugins-latest' ); // optional
-define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // optional; if true, empty token disables hooks
+define( 'AUP_GITHUB_TOKEN', '...' );
+define( 'AUP_GITHUB_REPOSITORY', 'owner/repo' );
+define( 'AUP_GITHUB_RELEASE_TAG', 'skl-plugins-latest' ); // optional
+define( 'AUP_GITHUB_PRIVATE', true ); // optional; if true, empty token disables hooks
 ```
 
 Правила:
 
 - Токен задаётся в конфиге сайта (wp-config / обвязка развёртывания), не в плагине и не в `wp_options`.
-- Репозиторий и tag Release тоже на сайте: `ART_UPDATER_GITHUB_REPOSITORY`, опционально `ART_UPDATER_GITHUB_RELEASE_TAG`.
+- Репозиторий и tag Release тоже на сайте: `AUP_GITHUB_REPOSITORY`, опционально `AUP_GITHUB_RELEASE_TAG`.
 - Плагин в updater передаёт только `__FILE__`. Токен в конструктор плагина не передаётся: библиотека читает сайт.
 - Ротация PAT на 20–30 сайтах не решается рантайм-синхронизацией и не тянет gateway в v1. Это декларативный шаг
   развёртывания сайта: поставить WP, подключить обвязку, задать константу токена.
@@ -215,10 +217,10 @@ define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // optional; if true, empty token 
 
 Для GitHubProvider:
 
-- нет `ART_UPDATER_GITHUB_REPOSITORY` → хуки не регистрируются;
+- нет `AUP_GITHUB_REPOSITORY` → хуки не регистрируются;
 - публичный репозиторий: токен не обязателен;
-- `ART_UPDATER_GITHUB_PRIVATE` истинно и токен пустой → хуки не регистрируются;
-- непустое значение `ART_UPDATER_GITHUB_TOKEN` → credentials для GitHub считаются заданными.
+- `AUP_GITHUB_PRIVATE` истинно и токен пустой → хуки не регистрируются;
+- непустое значение `AUP_GITHUB_TOKEN` → credentials для GitHub считаются заданными.
 
 Проверка «источник готов» отделена от GitHub-специфики, чтобы позже `GatewayProvider` мог иметь свои критерии.
 
@@ -244,7 +246,7 @@ define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // optional; if true, empty token 
 
 - `composer.json` — пакет `art/updater`, PHP `>=8.3`, PSR-4 `Art\\Updater\\` → `src/php/`
 - `phpcs.xml` — `testVersion` 8.3-
-- `src/php/Plugin.php`
+- `src/php/Config.php`
 - `src/php/Update.php`
 - `src/php/UpdateProviderInterface.php`
 - `src/php/GitHubProvider.php`
@@ -258,7 +260,7 @@ Workflow репозитория плагинов не менялся.
 
 Функциональных тестов обновления на живом WordPress ещё нет.
 
-`PluginUpdater` регистрирует хуки штатного updater. Код на PHP 8.3: typed properties, `readonly` у `Plugin`/`Update`, union types. phpcs по `src/php/` проходит.
+`PluginUpdater` регистрирует хуки штатного updater. Код на PHP 8.3: typed properties, `readonly` у `Plugin`/`Update`, union types, typed class constants в `Config`. phpcs по `src/php/` проходит.
 
 Проверено на уровне требований и существующего runner:
 
@@ -369,7 +371,7 @@ new GitHubProvider( 'owner/repo', 'skl-plugins-latest' );
 
 Пустой второй аргумент → `GET /releases/latest`. Для skladchina `make_latest: false`, нужен tag alias (`skl-plugins-latest`).
 
-Поведение: Release → asset `update-metadata.json` → запись по slug → `version_compare` → `Update` с `package_url` = GitHub API URL asset (`Accept: application/octet-stream`). Токен из `ART_UPDATER_GITHUB_TOKEN` (Bearer), если задан. Ответ кешируется transient'ом (успех 6 часов, ошибка 15 минут, фильтр `art_updater_github_cache_ttl`).
+Поведение: Release → asset `update-metadata.json` → запись по slug → `version_compare` → `Update` с `package_url` = GitHub API URL asset (`Accept: application/octet-stream`). Токен из `AUP_GITHUB_TOKEN` (Bearer), если задан. Ответ кешируется transient'ом (успех 6 часов, ошибка 15 минут, фильтр `aup_github_cache_ttl`).
 
 Скачивание ZIP через `Plugin_Upgrader` ещё не подключено: URL уже нормализован, заголовок авторизации на download — шаг WP-интеграции.
 
@@ -391,7 +393,7 @@ new GitHubProvider( 'owner/repo', 'skl-plugins-latest' );
 
 ### Шаг 7. Подключить чтение credentials с сайта
 
-Сделано в `PluginUpdater`: без `ART_UPDATER_GITHUB_REPOSITORY` хуки не вешаются. `ART_UPDATER_GITHUB_PRIVATE` + пустой токен — тоже не вешаются. Плагин токен не передаёт.
+Сделано в `PluginUpdater`: без `AUP_GITHUB_REPOSITORY` хуки не вешаются. `AUP_GITHUB_PRIVATE` + пустой токен — тоже не вешаются. Плагин токен не передаёт.
 
 ### Шаг 8. Подключить библиотеку к одному тестовому плагину
 
