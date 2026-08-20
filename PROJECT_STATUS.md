@@ -144,18 +144,13 @@ UpdateProviderInterface
 
 GitHub-специфичные структуры не должны распространяться по остальной библиотеке.
 
-Provider должен преобразовывать источник данных в нормализованный объект обновления, условно:
+Provider должен преобразовывать источник данных в нормализованный объект `Update`:
 
-```text
-Update
-- version
-- package
-- changelog
-- requires
-- tested
-```
+- `version`, `package` (имя ZIP) — обязательны, из metadata;
+- `package_url` — URL скачивания, его заполняет provider;
+- `changelog`, `requires`, `tested`, `updated_at` — опциональны; в metadata v1 есть только `updated_at`.
 
-Таким образом, переход с GitHub на gateway не потребует изменения WordPress updater или кода плагинов.
+Доменные объекты лежат в `src/php/` (`Art\Updater\`): `Plugin`, `Update`, `UpdateProviderInterface`. GitHub-структуры в них не входят.
 
 ### 6. Регистрация плагинов
 
@@ -173,9 +168,7 @@ new PluginUpdater(
 
 ### 7. Composer
 
-Библиотека будет отдельным публичным GitHub-репозиторием и подключаться через Composer как VCS dependency.
-
-Она не обязана публиковаться в Packagist.
+Пакет: `art/updater`. Подключается как VCS dependency, Packagist не обязателен.
 
 Каждый плагин получает библиотеку через Composer и при сборке runner выполняет:
 
@@ -238,18 +231,20 @@ define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
 
 ## Изменённые основные файлы
 
-На этом этапе исходные файлы проекта **не изменялись**.
-
-Создаётся только этот передаточный документ:
-
+- `composer.json` — пакет `art/updater`, PSR-4 `Art\\Updater\\` → `src/php/`
+- `src/php/Plugin.php`
+- `src/php/Update.php`
+- `src/php/UpdateProviderInterface.php`
+- `README.md`
 - `PROJECT_STATUS.md`
 
-Исходный предоставленный workflow находится во вложенном материале текущего этапа; его фактическое изменение пока не
-выполнялось.
+Workflow репозитория плагинов не менялся.
 
 ## Результаты тестирования и проверки
 
-Функциональная реализация updater ещё не начата, поэтому рабочих тестов обновления WordPress пока нет.
+Функциональная реализация GitHubProvider и WordPress updater ещё не начата, рабочих тестов обновления WordPress пока нет.
+
+Доменные объекты добавлены; phpcs по `src/php/` проходит.
 
 Проверено на уровне требований и существующего runner:
 
@@ -263,7 +258,7 @@ define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
 
 ## Известные проблемы / открытые вопросы
 
-1. Нужно реализовать `UpdateProviderInterface` и GitHub provider.
+1. Нужно реализовать GitHubProvider.
 2. Нужно определить кеширование ответа GitHub, чтобы не делать API-запросы при каждой проверке обновлений.
 3. Нужно корректно работать с приватными Release assets при скачивании ZIP.
 4. Нужно определить механизм безопасной передачи credentials в HTTP-запросах WordPress.
@@ -331,25 +326,23 @@ API.
 
 ### Шаг 3. Создать публичный Composer repository библиотеки
 
-Предполагаемое назначение:
-
-```text
-art/wp-updater
-```
-
-Структура и namespace должны быть независимы от конкретного проекта Skl.
+Сделано в этом репозитории. Пакет: `art/updater`, namespace `Art\Updater\`, PSR-4 → `src/php/`.
 
 ### Шаг 4. Спроектировать доменные объекты библиотеки
 
-Минимально:
+Сделано:
 
 ```text
-Plugin
-Update
-UpdateProviderInterface
+Art\Updater\Plugin
+Art\Updater\Update
+Art\Updater\UpdateProviderInterface
 ```
 
-Не протаскивать GitHub response внутрь WordPress слоя.
+`Plugin`: slug, установленная версия, plugin basename (`skl-core/skl-core.php`).
+`Update`: version, package, package_url, опционально changelog / requires / tested / updated_at.
+`UpdateProviderInterface::get_update( Plugin ): ?Update` — `null`, если плагина нет в источнике или версия не новее.
+
+GitHub response внутрь этих типов не протаскивается.
 
 ### Шаг 5. Реализовать GitHubProvider
 
@@ -430,6 +423,6 @@ WordPress Updater
 
 ## Текущая точка продолжения
 
-Контракт metadata и генерация в runner зафиксированы. Credentials для v1 — GitHub PAT через `ART_UPDATER_GITHUB_TOKEN`.
+Доменные объекты есть. Credentials для v1 — GitHub PAT через `ART_UPDATER_GITHUB_TOKEN`.
 
-Следующий этап — пакет `art/wp-updater`: доменные объекты, `GitHubProvider`, интеграция WordPress.
+Следующий этап — `GitHubProvider`, затем интеграция WordPress.
