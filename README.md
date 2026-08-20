@@ -10,7 +10,7 @@ Composer-библиотека штатных обновлений WordPress-пл
 
 ## Статус
 
-Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater` и доменные объекты. GitHubProvider и хуки WordPress ещё не написаны.
+Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater`, доменные объекты и `GitHubProvider`. Хуки WordPress ещё не написаны.
 
 Credentials для v1: GitHub PAT в конфиге сайта (`ART_UPDATER_GITHUB_TOKEN`). Плагин токен не получает. Для публичного
 репозитория токен не обязателен; для приватного без константы updater не стартует. Ротация на парке сайтов — шаг
@@ -102,7 +102,7 @@ UpdateProviderInterface
         └── GatewayProvider      ← позже
 ```
 
-Минимальные доменные объекты уже есть: `Art\Updater\Plugin`, `Art\Updater\Update`, `Art\Updater\UpdateProviderInterface`.
+Минимальные доменные объекты уже есть: `Art\Updater\Plugin`, `Art\Updater\Update`, `Art\Updater\UpdateProviderInterface`. `GitHubProvider` принимает `owner/repo` и опциональный tag Release (для skladchina — `skl-plugins-latest`).
 
 Хуки WordPress:
 
@@ -125,32 +125,29 @@ UpdateProviderInterface
 - Контракт metadata v1 и генерация `update-metadata.json` в runner.
 - Пакет `art/updater`, namespace `Art\Updater\`.
 - Доменные объекты: `Plugin`, `Update`, `UpdateProviderInterface`.
+- `GitHubProvider`: Release → `update-metadata.json` → slug → `Update`; кеш transient; `package_url` = API URL asset.
 - Передаточный статус в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ### Дальше
 
-1. **GitHubProvider.** Release → `update-metadata.json` → запись по slug → сравнение версии → нормализованный `Update` и данные для скачивания приватного asset.
-2. **Интеграция WordPress.** Хуки выше, поведение как у штатного updater.
-3. **Чтение credentials.** Константа на сайт; для приватного GitHub без токена не стартовать; плагины токен не передают.
+1. **Интеграция WordPress.** Хуки выше, поведение как у штатного updater, авторизованное скачивание приватного ZIP.
+2. **Чтение credentials при старте.** Константа на сайт; для приватного GitHub без токена не стартовать; плагины токен не передают.
 
 ### Проверка
 
-4. Один тестовый плагин: Composer → регистрация → новая версия в админке → детали → скачивание приватного ZIP → установка → путь и активация после `Plugin_Upgrader`.
-5. Новый общий Release, версия конкретного плагина не изменилась → обновления для него нет.
+3. Один тестовый плагин: Composer → регистрация → новая версия в админке → детали → скачивание приватного ZIP → установка → путь и активация после `Plugin_Upgrader`.
+4. Новый общий Release, версия конкретного плагина не изменилась → обновления для него нет.
 
 ### Позже
 
-6. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
+5. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
 
-Сейчас следующий шаг — `GitHubProvider`.
+Сейчас следующий шаг — интеграция WordPress.
 
 ## Открытые вопросы
 
-1. Реализация GitHubProvider.
-2. Кеш ответа GitHub, чтобы не бить API на каждую проверку обновлений.
-3. Скачивание приватных Release assets.
-4. Безопасная передача credentials в HTTP-запросах WordPress.
-5. Минимальный набор данных для `plugins_api` и страницы деталей.
-6. Требования к `requires`, `tested`, changelog и прочим полям updater.
-7. Обновление активного плагина и сохранение пути после `Plugin_Upgrader`.
-8. Совместимость версий самой updater-библиотеки.
+1. Хуки WordPress updater и скачивание приватного ZIP.
+2. Минимальный набор данных для `plugins_api` и страницы деталей.
+3. Требования к `requires`, `tested`, changelog и прочим полям updater.
+4. Обновление активного плагина и сохранение пути после `Plugin_Upgrader`.
+5. Совместимость версий самой updater-библиотеки.

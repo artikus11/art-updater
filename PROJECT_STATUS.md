@@ -234,7 +234,7 @@ define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
 - `composer.json` — пакет `art/updater`, PSR-4 `Art\\Updater\\` → `src/php/`
 - `src/php/Plugin.php`
 - `src/php/Update.php`
-- `src/php/UpdateProviderInterface.php`
+- `src/php/GitHubProvider.php`
 - `README.md`
 - `PROJECT_STATUS.md`
 
@@ -242,9 +242,9 @@ Workflow репозитория плагинов не менялся.
 
 ## Результаты тестирования и проверки
 
-Функциональная реализация GitHubProvider и WordPress updater ещё не начата, рабочих тестов обновления WordPress пока нет.
+Функциональная реализация WordPress updater ещё не начата, рабочих тестов обновления WordPress пока нет.
 
-Доменные объекты добавлены; phpcs по `src/php/` проходит.
+`GitHubProvider` добавлен; phpcs по `src/php/` проходит.
 
 Проверено на уровне требований и существующего runner:
 
@@ -258,14 +258,11 @@ Workflow репозитория плагинов не менялся.
 
 ## Известные проблемы / открытые вопросы
 
-1. Нужно реализовать GitHubProvider.
-2. Нужно определить кеширование ответа GitHub, чтобы не делать API-запросы при каждой проверке обновлений.
-3. Нужно корректно работать с приватными Release assets при скачивании ZIP.
-4. Нужно определить механизм безопасной передачи credentials в HTTP-запросах WordPress.
-5. Нужно определить минимальный набор данных для `plugins_api` и страницы деталей обновления.
-6. Нужно определить требования к `requires`, `tested`, changelog и другим полям WordPress updater.
-7. Нужно проверить установку/обновление активного плагина и сохранение его корректного пути после `Plugin_Upgrader`.
-8. Нужно определить стратегию совместимости версий самой updater-библиотеки.
+1. Нужно реализовать WordPress integration (хуки updater, в т.ч. авторизованное скачивание приватного ZIP).
+2. Нужно определить минимальный набор данных для `plugins_api` и страницы деталей обновления.
+3. Нужно определить требования к `requires`, `tested`, changelog и другим полям WordPress updater.
+4. Нужно проверить установку/обновление активного плагина и сохранение его корректного пути после `Plugin_Upgrader`.
+5. Нужно определить стратегию совместимости версий самой updater-библиотеки.
 
 ## Опробованные, но не выбранные подходы
 
@@ -346,14 +343,17 @@ GitHub response внутрь этих типов не протаскиваетс
 
 ### Шаг 5. Реализовать GitHubProvider
 
-Provider должен:
+Сделано: `Art\Updater\GitHubProvider`.
 
-1. получить актуальный Release;
-2. получить metadata;
-3. найти запись по plugin slug;
-4. сравнить версию с установленной;
-5. вернуть нормализованный `Update`;
-6. предоставить package URL/данные для скачивания приватного asset.
+```php
+new GitHubProvider( 'owner/repo', 'skl-plugins-latest' );
+```
+
+Пустой второй аргумент → `GET /releases/latest`. Для skladchina `make_latest: false`, нужен tag alias (`skl-plugins-latest`).
+
+Поведение: Release → asset `update-metadata.json` → запись по slug → `version_compare` → `Update` с `package_url` = GitHub API URL asset (`Accept: application/octet-stream`). Токен из `ART_UPDATER_GITHUB_TOKEN` (Bearer), если задан. Ответ кешируется transient'ом (успех 6 часов, ошибка 15 минут, фильтр `art_updater_github_cache_ttl`).
+
+Скачивание ZIP через `Plugin_Upgrader` ещё не подключено: URL уже нормализован, заголовок авторизации на download — шаг WP-интеграции.
 
 ### Шаг 6. Реализовать WordPress integration
 
@@ -423,6 +423,6 @@ WordPress Updater
 
 ## Текущая точка продолжения
 
-Доменные объекты есть. Credentials для v1 — GitHub PAT через `ART_UPDATER_GITHUB_TOKEN`.
+Доменные объекты и `GitHubProvider` есть. Credentials для v1 — GitHub PAT через `ART_UPDATER_GITHUB_TOKEN`.
 
-Следующий этап — `GitHubProvider`, затем интеграция WordPress.
+Следующий этап — интеграция WordPress (хуки updater и скачивание приватного ZIP).
