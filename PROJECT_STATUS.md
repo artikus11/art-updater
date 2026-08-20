@@ -4,7 +4,7 @@
 
 Библиотека автоматических обновлений WordPress-плагинов через штатный механизм обновлений WordPress.
 
-Рабочая концепция: отдельная Composer-библиотека из публичного GitHub-репозитория. На первом этапе источник обновлений —
+Рабочая концепция: отдельная Composer-библиотека из публичного GitHub-репозитория. Требование PHP: `>=8.3`. На первом этапе источник обновлений —
 приватный GitHub-репозиторий с релизами; архитектура должна позволять позднее заменить GitHub на собственный update
 gateway без изменения интеграции плагинов.
 
@@ -174,7 +174,7 @@ new PluginUpdater(
 
 ### 7. Composer
 
-Пакет: `art/updater`. Подключается как VCS dependency, Packagist не обязателен.
+Пакет: `art/updater`. PHP `>=8.3`. Подключается как VCS dependency, Packagist не обязателен.
 
 Каждый плагин получает библиотеку через Composer и при сборке runner выполняет:
 
@@ -242,9 +242,12 @@ define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // optional; if true, empty token 
 
 ## Изменённые основные файлы
 
-- `composer.json` — пакет `art/updater`, PSR-4 `Art\\Updater\\` → `src/php/`
+- `composer.json` — пакет `art/updater`, PHP `>=8.3`, PSR-4 `Art\\Updater\\` → `src/php/`
+- `phpcs.xml` — `testVersion` 8.3-
 - `src/php/Plugin.php`
 - `src/php/Update.php`
+- `src/php/UpdateProviderInterface.php`
+- `src/php/GitHubProvider.php`
 - `src/php/PluginUpdater.php`
 - `README.md`
 - `PROJECT_STATUS.md`
@@ -255,7 +258,7 @@ Workflow репозитория плагинов не менялся.
 
 Функциональных тестов обновления на живом WordPress ещё нет.
 
-`PluginUpdater` регистрирует хуки штатного updater; phpcs по `src/php/` проходит.
+`PluginUpdater` регистрирует хуки штатного updater. Код на PHP 8.3: typed properties, `readonly` у `Plugin`/`Update`, union types. phpcs по `src/php/` проходит.
 
 Проверено на уровне требований и существующего runner:
 
@@ -338,7 +341,7 @@ API.
 
 ### Шаг 3. Создать публичный Composer repository библиотеки
 
-Сделано в этом репозитории. Пакет: `art/updater`, namespace `Art\Updater\`, PSR-4 → `src/php/`.
+Сделано в этом репозитории. Пакет: `art/updater`, PHP `>=8.3`, namespace `Art\Updater\`, PSR-4 → `src/php/`.
 
 ### Шаг 4. Спроектировать доменные объекты библиотеки
 
@@ -350,7 +353,7 @@ Art\Updater\Update
 Art\Updater\UpdateProviderInterface
 ```
 
-`Plugin`: slug, установленная версия, plugin basename (`skl-core/skl-core.php`).
+`Plugin` и `Update` — `readonly` class. `Plugin`: slug, установленная версия, plugin basename (`skl-core/skl-core.php`).
 `Update`: version, package, package_url, опционально changelog / requires / tested / updated_at.
 `UpdateProviderInterface::get_update( Plugin ): ?Update` — `null`, если плагина нет в источнике или версия не новее.
 
@@ -438,6 +441,6 @@ WordPress Updater
 
 ## Текущая точка продолжения
 
-Доменные объекты, `GitHubProvider` и `PluginUpdater` есть.
+Доменные объекты, `GitHubProvider` и `PluginUpdater` есть. Код рассчитан на PHP `>=8.3`.
 
 Следующий этап — подключить библиотеку к одному тестовому плагину и пройти цикл обновления.

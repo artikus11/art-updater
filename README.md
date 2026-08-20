@@ -1,6 +1,6 @@
 # art-updater
 
-Composer-библиотека штатных обновлений WordPress-плагинов.
+Composer-библиотека штатных обновлений WordPress-плагинов. PHP `>=8.3`.
 
 Первый источник обновлений — общий приватный GitHub Release со snapshot всех плагинов. Позже источник можно заменить на собственный update gateway, не меняя код плагинов.
 
@@ -10,7 +10,7 @@ Composer-библиотека штатных обновлений WordPress-пл
 
 ## Статус
 
-Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater`, доменные объекты, `GitHubProvider` и `PluginUpdater`. Цикл на живом WordPress ещё не прогоняли.
+Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater` (PHP `>=8.3`), доменные объекты, `GitHubProvider` и `PluginUpdater`. Цикл на живом WordPress ещё не прогоняли.
 
 Credentials для v1: GitHub PAT в конфиге сайта (`ART_UPDATER_GITHUB_TOKEN`). Плагин токен не получает. Для публичного
 репозитория токен не обязателен; для приватного без константы updater не стартует. Ротация на парке сайтов — шаг
@@ -59,7 +59,7 @@ Runner уже генерирует этот файл и дублирует asset
 - **Slug.** Дополнительный `asset_name` не нужен. `plugin_basename(__FILE__)` → первая часть пути: `skl-core/skl-core.php` → `skl-core` → `skl-core.zip`.
 - **Версия.** Сравнивается установленный `Version` с записью в metadata, не с GitHub tag.
 - **Provider.** WordPress-слой и источник данных разделены. GitHub-структуры не протекают в updater. Provider отдаёт нормализованный `Update`.
-- **Домен.** `Plugin`, `Update`, `UpdateProviderInterface` в `src/php/`.
+- **Домен.** `readonly` `Plugin` и `Update`, `UpdateProviderInterface` в `src/php/`. PHP `>=8.3`.
 - **Регистрация.** Только `__FILE__`. Slug, basename и `Version` читаются из файла, не из массива в вызове.
 - **Credentials.** GitHub PAT через `ART_UPDATER_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим; без репозитория или `ART_UPDATER_GITHUB_PRIVATE` без токена — updater молчит.
 - **Metadata.** Контракт v1 — `update-metadata.json` в assets Release. Полный snapshot, без `requires` / `tested` / `changelog`.
@@ -92,6 +92,7 @@ define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // опционально
 ```json
 {
   "require": {
+    "php": ">=8.3",
     "art/updater": "^1.0"
   }
 }
@@ -151,8 +152,8 @@ UpdateProviderInterface
 - Направление credentials закрыто: PAT на сайте, инструкция развёртывания, не gateway в v1.
 - Правило активации: публичный GitHub без токена допустим; приватный без токена — updater выключен.
 - Контракт metadata v1 и генерация `update-metadata.json` в runner.
-- Пакет `art/updater`, namespace `Art\Updater\`.
-- Доменные объекты: `Plugin`, `Update`, `UpdateProviderInterface`.
+- Пакет `art/updater`, PHP `>=8.3`, namespace `Art\Updater\`.
+- Доменные объекты: `readonly` `Plugin` и `Update`, `UpdateProviderInterface`.
 - `GitHubProvider`: Release → `update-metadata.json` → slug → `Update`; кеш transient; `package_url` = API URL asset.
 - `PluginUpdater`: хуки WP, авторизованное скачивание GitHub asset, путь после установки = slug.
 - Передаточный статус в [PROJECT_STATUS.md](PROJECT_STATUS.md).
