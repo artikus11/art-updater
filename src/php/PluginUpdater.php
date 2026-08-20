@@ -174,14 +174,14 @@ final class PluginUpdater {
 	}
 
 	private function make_github_provider(): ?GitHubProvider {
-		$repository = $this->constant_string( 'ART_UPDATER_GITHUB_REPOSITORY' );
+		$repository = $this->constant_string( Config::GITHUB_REPOSITORY );
 
 		if ( '' === $repository ) {
 			return null;
 		}
 
-		$private = defined( 'ART_UPDATER_GITHUB_PRIVATE' ) && ART_UPDATER_GITHUB_PRIVATE;
-		$token   = $this->constant_string( 'ART_UPDATER_GITHUB_TOKEN' );
+		$private = defined( Config::GITHUB_PRIVATE ) && constant( Config::GITHUB_PRIVATE );
+		$token   = $this->constant_string( Config::GITHUB_TOKEN );
 
 		if ( $private && '' === $token ) {
 			return null;
@@ -189,7 +189,7 @@ final class PluginUpdater {
 
 		return new GitHubProvider(
 			$repository,
-			$this->constant_string( 'ART_UPDATER_GITHUB_RELEASE_TAG' )
+			$this->constant_string( Config::GITHUB_RELEASE_TAG )
 		);
 	}
 
@@ -278,7 +278,7 @@ final class PluginUpdater {
 		$tmp = wp_tempnam( $url );
 
 		if ( ! $tmp ) {
-			return new \WP_Error( 'art_updater_tmp', 'Could not create a temporary file for the plugin package.' );
+			return new \WP_Error( Config::ERROR_TMP, 'Could not create a temporary file for the plugin package.' );
 		}
 
 		$response = $this->request_package( $url, $tmp );
@@ -297,7 +297,7 @@ final class PluginUpdater {
 			if ( ! is_string( $location ) || '' === $location ) {
 				wp_delete_file( $tmp );
 
-				return new \WP_Error( 'art_updater_redirect', 'GitHub asset redirect is missing a Location header.' );
+				return new \WP_Error( Config::ERROR_REDIRECT, 'GitHub asset redirect is missing a Location header.' );
 			}
 
 			$response = $this->request_package( $location, $tmp, false );
@@ -314,7 +314,7 @@ final class PluginUpdater {
 		if ( $code < 200 || $code >= 300 ) {
 			wp_delete_file( $tmp );
 
-			return new \WP_Error( 'art_updater_download', 'GitHub asset download failed.' );
+			return new \WP_Error( Config::ERROR_DOWNLOAD, 'GitHub asset download failed.' );
 		}
 
 		return $tmp;
@@ -327,7 +327,7 @@ final class PluginUpdater {
 
 		if ( $authorize && $this->is_github_asset_url( $url ) ) {
 			$headers['Accept'] = 'application/octet-stream';
-			$token             = $this->constant_string( 'ART_UPDATER_GITHUB_TOKEN' );
+			$token             = $this->constant_string( Config::GITHUB_TOKEN );
 
 			if ( '' !== $token ) {
 				$headers['Authorization'] = 'Bearer ' . $token;

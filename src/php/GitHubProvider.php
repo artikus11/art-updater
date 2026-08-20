@@ -6,12 +6,6 @@ namespace Art\Updater;
 
 final class GitHubProvider implements UpdateProviderInterface {
 
-	private const METADATA_ASSET = 'update-metadata.json';
-	private const API_BASE       = 'https://api.github.com/repos/';
-	private const CACHE_PREFIX   = 'art_updater_gh_';
-	private const CACHE_TTL      = 21600;
-	private const FAIL_TTL       = 900;
-
 	private readonly string $repository;
 	private readonly string $release_tag;
 
@@ -116,7 +110,7 @@ final class GitHubProvider implements UpdateProviderInterface {
 
 			$assets[ $name ] = $url;
 
-			if ( self::METADATA_ASSET === $name ) {
+			if ( Config::METADATA_ASSET === $name ) {
 				$metadata_url = $url;
 			}
 		}
@@ -144,7 +138,7 @@ final class GitHubProvider implements UpdateProviderInterface {
 	}
 
 	private function release_url(): string {
-		$base = self::API_BASE . $this->repository;
+		$base = Config::API_BASE . $this->repository;
 
 		if ( '' === $this->release_tag ) {
 			return $base . '/releases/latest';
@@ -215,11 +209,11 @@ final class GitHubProvider implements UpdateProviderInterface {
 	}
 
 	private function get_token(): string {
-		if ( ! defined( 'ART_UPDATER_GITHUB_TOKEN' ) ) {
+		if ( ! defined( Config::GITHUB_TOKEN ) ) {
 			return '';
 		}
 
-		$token = ART_UPDATER_GITHUB_TOKEN;
+		$token = constant( Config::GITHUB_TOKEN );
 
 		return is_string( $token ) ? trim( $token ) : '';
 	}
@@ -229,11 +223,11 @@ final class GitHubProvider implements UpdateProviderInterface {
 	}
 
 	private function cache_key(): string {
-		return self::CACHE_PREFIX . md5( $this->repository . "\0" . $this->release_tag );
+		return Config::CACHE_PREFIX . md5( $this->repository . "\0" . $this->release_tag );
 	}
 
 	private function cache_ttl( bool $success ): int {
-		$default = $success ? self::CACHE_TTL : self::FAIL_TTL;
+		$default = $success ? Config::CACHE_TTL : Config::FAIL_TTL;
 
 		if ( $success && defined( 'HOUR_IN_SECONDS' ) ) {
 			$default = 6 * HOUR_IN_SECONDS;
@@ -243,7 +237,7 @@ final class GitHubProvider implements UpdateProviderInterface {
 			$default = 15 * MINUTE_IN_SECONDS;
 		}
 
-		$ttl = apply_filters( 'art_updater_github_cache_ttl', $default, $success, $this->repository, $this->release_tag );
+		$ttl = apply_filters( Config::CACHE_TTL_FILTER, $default, $success, $this->repository, $this->release_tag );
 
 		return is_int( $ttl ) && $ttl > 0 ? $ttl : $default;
 	}
