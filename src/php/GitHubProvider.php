@@ -12,15 +12,8 @@ final class GitHubProvider implements UpdateProviderInterface {
 	private const CACHE_TTL      = 21600;
 	private const FAIL_TTL       = 900;
 
-	/**
-	 * @var string owner/repo
-	 */
-	private $repository;
-
-	/**
-	 * @var string Empty = GitHub /releases/latest. Otherwise releases/tags/{tag}.
-	 */
-	private $release_tag;
+	private readonly string $repository;
+	private readonly string $release_tag;
 
 	public function __construct( string $repository, string $release_tag = '' ) {
 		$this->repository  = trim( $repository, '/' );
@@ -106,8 +99,8 @@ final class GitHubProvider implements UpdateProviderInterface {
 			return null;
 		}
 
-		$assets        = [];
-		$metadata_url  = null;
+		$assets       = [];
+		$metadata_url = null;
 
 		foreach ( $release['assets'] as $asset ) {
 			if ( ! is_array( $asset ) ) {
@@ -160,9 +153,6 @@ final class GitHubProvider implements UpdateProviderInterface {
 		return $base . '/releases/tags/' . rawurlencode( $this->release_tag );
 	}
 
-	/**
-	 * @return array<string, mixed>|null
-	 */
 	private function request_json( string $url ): ?array {
 		$body = $this->request(
 			$url,
@@ -191,10 +181,6 @@ final class GitHubProvider implements UpdateProviderInterface {
 		);
 	}
 
-	/**
-	 * @param string                $url
-	 * @param array<string, string> $headers
-	 */
 	private function request( string $url, array $headers ): ?string {
 		$headers['User-Agent'] = 'art-updater';
 

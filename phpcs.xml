@@ -11,8 +11,8 @@
     <arg name="parallel" value="10"/><!-- Enables parallel processing when available for faster results. -->
     <arg name="cache" value=".phpcs.cache"/>
 
-    <!-- Check for cross-version support for PHP 7.4 and higher. -->
-    <config name="testVersion" value="7.4-"/>
+    <!-- Check for cross-version support for PHP 8.3 and higher. -->
+    <config name="testVersion" value="8.3-"/>
 
     <!-- Minimum WP version to check for usage of deprecated functions, classes and function parameters -->
     <config name="minimum_supported_wp_version" value="5.5.0"/>

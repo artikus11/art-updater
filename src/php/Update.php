@@ -4,59 +4,17 @@ declare(strict_types=1);
 
 namespace Art\Updater;
 
-final class Update {
-
-	/**
-	 * @var string
-	 */
-	private $version;
-
-	/**
-	 * @var string ZIP filename in the release, e.g. skl-core.zip.
-	 */
-	private $package;
-
-	/**
-	 * @var string|null Download URL resolved by the provider.
-	 */
-	private $package_url;
-
-	/**
-	 * @var string|null
-	 */
-	private $changelog;
-
-	/**
-	 * @var string|null
-	 */
-	private $requires;
-
-	/**
-	 * @var string|null
-	 */
-	private $tested;
-
-	/**
-	 * @var string|null
-	 */
-	private $updated_at;
+final readonly class Update {
 
 	public function __construct(
-		string $version,
-		string $package,
-		?string $package_url = null,
-		?string $changelog = null,
-		?string $requires = null,
-		?string $tested = null,
-		?string $updated_at = null
+		private string $version,
+		private string $package,
+		private ?string $package_url = null,
+		private ?string $changelog = null,
+		private ?string $requires = null,
+		private ?string $tested = null,
+		private ?string $updated_at = null,
 	) {
-		$this->version     = $version;
-		$this->package     = $package;
-		$this->package_url = $package_url;
-		$this->changelog   = $changelog;
-		$this->requires    = $requires;
-		$this->tested      = $tested;
-		$this->updated_at  = $updated_at;
 	}
 
 	public function get_version(): string {

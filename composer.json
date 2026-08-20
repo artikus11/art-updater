@@ -15,7 +15,9 @@
             "email": "artikus.sol@gmail.com"
         }
     ],
-    "require": {},
+    "require": {
+        "php": ">=8.3"
+    },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.7",
         "wp-coding-standards/wpcs": "^3.0",

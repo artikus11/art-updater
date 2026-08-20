@@ -6,20 +6,14 @@ namespace Art\Updater;
 
 final class PluginUpdater {
 
-	/**
-	 * @var Plugin
-	 */
-	private $plugin;
+	private Plugin $plugin;
 
-	/**
-	 * @var UpdateProviderInterface
-	 */
-	private $provider;
+	private UpdateProviderInterface $provider;
 
 	/**
 	 * @var array<string, string>
 	 */
-	private $headers;
+	private array $headers = [];
 
 	public function __construct( string $plugin_file, ?UpdateProviderInterface $provider = null ) {
 		$plugin = $this->make_plugin( $plugin_file );
@@ -40,11 +34,7 @@ final class PluginUpdater {
 		$this->register();
 	}
 
-	/**
-	 * @param mixed $transient
-	 * @return mixed
-	 */
-	public function inject_update( $transient ) {
+	public function inject_update( mixed $transient ): mixed {
 		if ( ! is_object( $transient ) || empty( $transient->checked ) ) {
 			return $transient;
 		}
@@ -84,13 +74,7 @@ final class PluginUpdater {
 		return $transient;
 	}
 
-	/**
-	 * @param mixed  $result
-	 * @param string $action
-	 * @param mixed  $args
-	 * @return mixed
-	 */
-	public function plugin_information( $result, $action, $args ) {
+	public function plugin_information( mixed $result, string $action, mixed $args ): mixed {
 		if ( 'plugin_information' !== $action || ! is_object( $args ) || empty( $args->slug ) ) {
 			return $result;
 		}
@@ -99,14 +83,14 @@ final class PluginUpdater {
 			return $result;
 		}
 
-		$update  = $this->provider->get_update( $this->plugin );
-		$version = null !== $update ? $update->get_version() : $this->plugin->get_version();
-		$package = (string) $update?->get_package_url();
-		$tested  = null !== $update && null !== $update->get_tested() ? $update->get_tested() : $this->header( 'tested' );
-		$requires = null !== $update && null !== $update->get_requires() ? $update->get_requires() : $this->header( 'requires' );
-		$changelog = null !== $update && null !== $update->get_changelog() ? $update->get_changelog() : '';
+		$update    = $this->provider->get_update( $this->plugin );
+		$version   = $update?->get_version() ?? $this->plugin->get_version();
+		$package   = (string) $update?->get_package_url();
+		$tested    = $update?->get_tested() ?? $this->header( 'tested' );
+		$requires  = $update?->get_requires() ?? $this->header( 'requires' );
+		$changelog = $update?->get_changelog() ?? '';
 
-		$info = (object) [
+		return (object) [
 			'name'          => $this->header( 'name' ),
 			'slug'          => $this->plugin->get_slug(),
 			'version'       => $version,
@@ -122,18 +106,9 @@ final class PluginUpdater {
 				'changelog'   => $changelog,
 			],
 		];
-
-		return $info;
 	}
 
-	/**
-	 * @param bool|\WP_Error $reply
-	 * @param string         $package
-	 * @param mixed          $upgrader
-	 * @param array<string, mixed> $hook_extra
-	 * @return bool|\WP_Error|string
-	 */
-	public function pre_download( $reply, $package, $upgrader, $hook_extra = [] ) {
+	public function pre_download( mixed $reply, mixed $package, mixed $upgrader, mixed $hook_extra = [] ): mixed {
 		if ( false !== $reply || ! is_string( $package ) || ! $this->is_our_package( $package, $hook_extra ) ) {
 			return $reply;
 		}
@@ -141,13 +116,7 @@ final class PluginUpdater {
 		return $this->download_package( $package );
 	}
 
-	/**
-	 * @param mixed                $response
-	 * @param array<string, mixed> $hook_extra
-	 * @param array<string, mixed> $result
-	 * @return array<string, mixed>
-	 */
-	public function after_install( $response, $hook_extra, $result ) {
+	public function after_install( mixed $response, mixed $hook_extra, mixed $result ): mixed {
 		if ( ! is_array( $result ) || ! $this->is_our_upgrade( $hook_extra ) ) {
 			return $result;
 		}
@@ -253,13 +222,10 @@ final class PluginUpdater {
 	}
 
 	private function header( string $key ): string {
-		return isset( $this->headers[ $key ] ) ? $this->headers[ $key ] : '';
+		return $this->headers[ $key ] ?? '';
 	}
 
-	/**
-	 * @return object
-	 */
-	private function as_transient_item( string $version, string $package ) {
+	private function as_transient_item( string $version, string $package ): object {
 		return (object) [
 			'id'           => $this->plugin->get_plugin_file(),
 			'slug'         => $this->plugin->get_slug(),
@@ -273,10 +239,7 @@ final class PluginUpdater {
 		];
 	}
 
-	/**
-	 * @param array<string, mixed> $hook_extra
-	 */
-	private function is_our_upgrade( $hook_extra ): bool {
+	private function is_our_upgrade( mixed $hook_extra ): bool {
 		if ( ! is_array( $hook_extra ) ) {
 			return false;
 		}
@@ -290,11 +253,7 @@ final class PluginUpdater {
 			&& in_array( $this->plugin->get_plugin_file(), $hook_extra['plugins'], true );
 	}
 
-	/**
-	 * @param string               $package
-	 * @param array<string, mixed> $hook_extra
-	 */
-	private function is_our_package( string $package, $hook_extra ): bool {
+	private function is_our_package( string $package, mixed $hook_extra ): bool {
 		if ( $this->is_our_upgrade( $hook_extra ) ) {
 			return $this->is_github_asset_url( $package );
 		}
@@ -310,13 +269,10 @@ final class PluginUpdater {
 
 		return 'api.github.com' === $host
 			&& is_string( $path )
-			&& false !== strpos( $path, '/releases/assets/' );
+			&& str_contains( $path, '/releases/assets/' );
 	}
 
-	/**
-	 * @return string|\WP_Error
-	 */
-	private function download_package( string $url ) {
+	private function download_package( string $url ): string|\WP_Error {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 
 		$tmp = wp_tempnam( $url );
@@ -364,17 +320,14 @@ final class PluginUpdater {
 		return $tmp;
 	}
 
-	/**
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private function request_package( string $url, string $filename, bool $authorize = true ) {
+	private function request_package( string $url, string $filename, bool $authorize = true ): array|\WP_Error {
 		$headers = [
 			'User-Agent' => 'art-updater',
 		];
 
 		if ( $authorize && $this->is_github_asset_url( $url ) ) {
 			$headers['Accept'] = 'application/octet-stream';
-			$token               = $this->constant_string( 'ART_UPDATER_GITHUB_TOKEN' );
+			$token             = $this->constant_string( 'ART_UPDATER_GITHUB_TOKEN' );
 
 			if ( '' !== $token ) {
 				$headers['Authorization'] = 'Bearer ' . $token;
