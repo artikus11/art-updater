@@ -10,7 +10,7 @@ Composer-библиотека штатных обновлений WordPress-пл
 
 ## Статус
 
-Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater`, доменные объекты и `GitHubProvider`. Хуки WordPress ещё не написаны.
+Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater`, доменные объекты, `GitHubProvider` и `PluginUpdater`. Цикл на живом WordPress ещё не прогоняли.
 
 Credentials для v1: GitHub PAT в конфиге сайта (`ART_UPDATER_GITHUB_TOKEN`). Плагин токен не получает. Для публичного
 репозитория токен не обязателен; для приватного без константы updater не стартует. Ротация на парке сайтов — шаг
@@ -60,12 +60,13 @@ Runner уже генерирует этот файл и дублирует asset
 - **Версия.** Сравнивается установленный `Version` с записью в metadata, не с GitHub tag.
 - **Provider.** WordPress-слой и источник данных разделены. GitHub-структуры не протекают в updater. Provider отдаёт нормализованный `Update`.
 - **Домен.** `Plugin`, `Update`, `UpdateProviderInterface` в `src/php/`.
-- **Регистрация.** Плагин не передаёт slug и имя ZIP вручную, если их можно взять из `__FILE__`. Инфраструктурная конфигурация — на сайте, не в каждом плагине.
-- **Credentials.** GitHub PAT через `ART_UPDATER_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим, приватный без токена — updater молчит.
+- **Регистрация.** Только `__FILE__`. Slug, basename и `Version` читаются из файла, не из массива в вызове.
+- **Credentials.** GitHub PAT через `ART_UPDATER_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим; без репозитория или `ART_UPDATER_GITHUB_PRIVATE` без токена — updater молчит.
 - **Metadata.** Контракт v1 — `update-metadata.json` в assets Release. Полный snapshot, без `requires` / `tested` / `changelog`.
 
 Не выбрано:
 
+- массив slug/version в конструктор вместо `__FILE__`;
 - token в каждом плагине или в его настройках;
 - рантайм-синхронизация токена между сайтами;
 - GitHub App или gateway как способ ротации PAT в v1;
@@ -73,23 +74,50 @@ Runner уже генерирует этот файл и дублирует asset
 - скачивание ZIP только чтобы прочитать версию;
 - жёсткая привязка всей библиотеки к GitHub API.
 
-## Планируемый API
+## Подключение
 
-Целевой вызов в плагине:
-
-```php
-new PluginUpdater(
-    __FILE__
-);
-```
-
-На сайте:
+Сайт, `wp-config.php` (или обвязка развёртывания):
 
 ```php
 define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
+define( 'ART_UPDATER_GITHUB_REPOSITORY', 'owner/repo' );
+define( 'ART_UPDATER_GITHUB_RELEASE_TAG', 'skl-plugins-latest' ); // опционально
+define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // опционально
 ```
 
-Слои:
+Без `ART_UPDATER_GITHUB_REPOSITORY` хуки не регистрируются. `ART_UPDATER_GITHUB_PRIVATE` + пустой токен — тоже.
+
+Плагин, `composer.json`:
+
+```json
+{
+  "require": {
+    "art/updater": "^1.0"
+  }
+}
+```
+
+Репозиторий пакета подключается как Composer VCS, Packagist не обязателен.
+
+Главный файл плагина:
+
+```php
+<?php
+/**
+ * Plugin Name: Example
+ * Version: 1.4.2
+ */
+
+require __DIR__ . '/vendor/autoload.php';
+
+new \Art\Updater\PluginUpdater( __FILE__ );
+```
+
+Slug и ZIP библиотека берёт из пути файла (`example/example.php` → `example` → `example.zip`), версию — из заголовка `Version`. Токен и репозиторий в плагин не передаются.
+
+Второй аргумент `PluginUpdater` — опциональный `UpdateProviderInterface`, для тестов или будущего gateway.
+
+## API
 
 ```text
 WordPress Updater
@@ -102,7 +130,7 @@ UpdateProviderInterface
         └── GatewayProvider      ← позже
 ```
 
-Минимальные доменные объекты уже есть: `Art\Updater\Plugin`, `Art\Updater\Update`, `Art\Updater\UpdateProviderInterface`. `GitHubProvider` принимает `owner/repo` и опциональный tag Release (для skladchina — `skl-plugins-latest`).
+`GitHubProvider` берёт `owner/repo` и опциональный tag из констант сайта. Для skladchina tag — `skl-plugins-latest`, потому что `make_latest: false`.
 
 Хуки WordPress:
 
@@ -111,7 +139,7 @@ UpdateProviderInterface
 - `upgrader_pre_download`
 - `upgrader_post_install`
 
-Пакет в плагины подключается Composer'ом как `art/updater`. Сборка плагина уже умеет `composer install --no-dev --optimize-autoloader`.
+Сборка плагина уже умеет `composer install --no-dev --optimize-autoloader`.
 
 ## Роадмап
 
@@ -126,28 +154,22 @@ UpdateProviderInterface
 - Пакет `art/updater`, namespace `Art\Updater\`.
 - Доменные объекты: `Plugin`, `Update`, `UpdateProviderInterface`.
 - `GitHubProvider`: Release → `update-metadata.json` → slug → `Update`; кеш transient; `package_url` = API URL asset.
+- `PluginUpdater`: хуки WP, авторизованное скачивание GitHub asset, путь после установки = slug.
 - Передаточный статус в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ### Дальше
 
-1. **Интеграция WordPress.** Хуки выше, поведение как у штатного updater, авторизованное скачивание приватного ZIP.
-2. **Чтение credentials при старте.** Константа на сайт; для приватного GitHub без токена не стартовать; плагины токен не передают.
-
-### Проверка
-
-3. Один тестовый плагин: Composer → регистрация → новая версия в админке → детали → скачивание приватного ZIP → установка → путь и активация после `Plugin_Upgrader`.
-4. Новый общий Release, версия конкретного плагина не изменилась → обновления для него нет.
+1. Подключить к одному тестовому плагину и пройти цикл обновления.
+2. Сценарий «новый Release, версия плагина та же → обновления нет».
 
 ### Позже
 
-5. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
+3. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
 
-Сейчас следующий шаг — интеграция WordPress.
+Сейчас следующий шаг — проверка на тестовом плагине.
 
 ## Открытые вопросы
 
-1. Хуки WordPress updater и скачивание приватного ZIP.
-2. Минимальный набор данных для `plugins_api` и страницы деталей.
-3. Требования к `requires`, `tested`, changelog и прочим полям updater.
-4. Обновление активного плагина и сохранение пути после `Plugin_Upgrader`.
-5. Совместимость версий самой updater-библиотеки.
+1. Цикл обновления на живом WordPress (админка, ZIP, путь после `Plugin_Upgrader`).
+2. Сценарий стабильной версии при новом общем Release.
+3. Совместимость версий самой updater-библиотеки.

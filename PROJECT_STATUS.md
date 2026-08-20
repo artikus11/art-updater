@@ -154,9 +154,7 @@ Provider должен преобразовывать источник данны
 
 ### 6. Регистрация плагинов
 
-Плагин не должен вручную передавать slug и имя ZIP, если их можно определить из `__FILE__`.
-
-Целевая идея API:
+Зафиксировано: в плагин передаётся только `__FILE__`, не массив slug/version/package.
 
 ```php
 new PluginUpdater(
@@ -164,7 +162,15 @@ new PluginUpdater(
 );
 ```
 
-Общая инфраструктурная конфигурация updater должна быть централизованной на сайте.
+Из файла библиотека сама берёт:
+
+- plugin basename (`skl-core/skl-core.php`) — ключ в transient WordPress;
+- slug = первая часть basename = имя ZIP без `.zip`;
+- `Version` и остальные заголовки (`Plugin Name`, `Requires at least`, `Tested up to`) из того же PHP-файла.
+
+Массив с теми же полями — копия, которую можно рассинхронизировать с шапкой плагина. Для тестов и нестандартного layout второй аргумент конструктора — `UpdateProviderInterface`, не ручной slug.
+
+Общая инфраструктурная конфигурация updater остаётся на сайте.
 
 ### 7. Composer
 
@@ -185,11 +191,15 @@ composer install --no-dev --optimize-autoloader
 
 ```php
 define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
+define( 'ART_UPDATER_GITHUB_REPOSITORY', 'owner/repo' );
+define( 'ART_UPDATER_GITHUB_RELEASE_TAG', 'skl-plugins-latest' ); // optional
+define( 'ART_UPDATER_GITHUB_PRIVATE', true ); // optional; if true, empty token disables hooks
 ```
 
 Правила:
 
 - Токен задаётся в конфиге сайта (wp-config / обвязка развёртывания), не в плагине и не в `wp_options`.
+- Репозиторий и tag Release тоже на сайте: `ART_UPDATER_GITHUB_REPOSITORY`, опционально `ART_UPDATER_GITHUB_RELEASE_TAG`.
 - Плагин в updater передаёт только `__FILE__`. Токен в конструктор плагина не передаётся: библиотека читает сайт.
 - Ротация PAT на 20–30 сайтах не решается рантайм-синхронизацией и не тянет gateway в v1. Это декларативный шаг
   развёртывания сайта: поставить WP, подключить обвязку, задать константу токена.
@@ -205,9 +215,10 @@ define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
 
 Для GitHubProvider:
 
+- нет `ART_UPDATER_GITHUB_REPOSITORY` → хуки не регистрируются;
 - публичный репозиторий: токен не обязателен;
-- приватный репозиторий: нет `ART_UPDATER_GITHUB_TOKEN` или значение пустое → updater для этого источника выключен;
-- непустое значение константы → credentials для GitHub считаются заданными.
+- `ART_UPDATER_GITHUB_PRIVATE` истинно и токен пустой → хуки не регистрируются;
+- непустое значение `ART_UPDATER_GITHUB_TOKEN` → credentials для GitHub считаются заданными.
 
 Проверка «источник готов» отделена от GitHub-специфики, чтобы позже `GatewayProvider` мог иметь свои критерии.
 
@@ -234,7 +245,7 @@ define( 'ART_UPDATER_GITHUB_TOKEN', '...' );
 - `composer.json` — пакет `art/updater`, PSR-4 `Art\\Updater\\` → `src/php/`
 - `src/php/Plugin.php`
 - `src/php/Update.php`
-- `src/php/GitHubProvider.php`
+- `src/php/PluginUpdater.php`
 - `README.md`
 - `PROJECT_STATUS.md`
 
@@ -242,9 +253,9 @@ Workflow репозитория плагинов не менялся.
 
 ## Результаты тестирования и проверки
 
-Функциональная реализация WordPress updater ещё не начата, рабочих тестов обновления WordPress пока нет.
+Функциональных тестов обновления на живом WordPress ещё нет.
 
-`GitHubProvider` добавлен; phpcs по `src/php/` проходит.
+`PluginUpdater` регистрирует хуки штатного updater; phpcs по `src/php/` проходит.
 
 Проверено на уровне требований и существующего runner:
 
@@ -258,13 +269,17 @@ Workflow репозитория плагинов не менялся.
 
 ## Известные проблемы / открытые вопросы
 
-1. Нужно реализовать WordPress integration (хуки updater, в т.ч. авторизованное скачивание приватного ZIP).
-2. Нужно определить минимальный набор данных для `plugins_api` и страницы деталей обновления.
-3. Нужно определить требования к `requires`, `tested`, changelog и другим полям WordPress updater.
-4. Нужно проверить установку/обновление активного плагина и сохранение его корректного пути после `Plugin_Upgrader`.
-5. Нужно определить стратегию совместимости версий самой updater-библиотеки.
+1. Нужно проверить цикл на одном тестовом плагине (админка, ZIP, путь после `Plugin_Upgrader`).
+2. Нужно проверить сценарий «новый Release, версия плагина не изменилась → обновления нет».
+3. Нужно определить стратегию совместимости версий самой updater-библиотеки.
 
 ## Опробованные, но не выбранные подходы
+
+### Передавать в PluginUpdater массив slug/version вместо `__FILE__`
+
+Не выбран.
+
+Причина: runtime-объект `Plugin` — три строки, но источник истины — установленный PHP-файл. Массив можно заполнить иначе, чем `Version:` и каталог плагина; тогда сравнение с metadata и ключ WP разъедутся. `__FILE__` это якорь, не «путь ради пути».
 
 ### Передавать GitHub token каждому плагину
 
@@ -357,23 +372,23 @@ new GitHubProvider( 'owner/repo', 'skl-plugins-latest' );
 
 ### Шаг 6. Реализовать WordPress integration
 
-Подключить:
+Сделано: `Art\Updater\PluginUpdater`.
 
-```text
-pre_set_site_transient_update_plugins
-plugins_api
-upgrader_pre_download
-upgrader_post_install
-```
+Плагин: `new PluginUpdater( __FILE__ );` — slug и версия из файла, ZIP не передаётся.
 
-Поведение должно соответствовать штатному WordPress updater.
+Хуки: `pre_set_site_transient_update_plugins`, `plugins_api`, `upgrader_pre_download`, `upgrader_post_install`.
+
+`plugins_api`: имя/author/requires/tested/requires_php из заголовков плагина; версия и changelog из `Update`, если есть.
+
+Скачивание: `upgrader_pre_download` качает GitHub asset с `Accept: application/octet-stream` и Bearer; редирект на `objects.githubusercontent.com` без Authorization.
+
+`upgrader_post_install` приводит каталог установки к slug плагина.
+
+Второй аргумент конструктора — опциональный `UpdateProviderInterface` (тесты / будущий gateway).
 
 ### Шаг 7. Подключить чтение credentials с сайта
 
-Решение уже зафиксировано: `ART_UPDATER_GITHUB_TOKEN`, без `wp_options`, без передачи токена из плагина.
-
-На этом шаге только реализация: библиотека читает константу, для приватного GitHub без токена не инициализируется,
-для публичного работает без него.
+Сделано в `PluginUpdater`: без `ART_UPDATER_GITHUB_REPOSITORY` хуки не вешаются. `ART_UPDATER_GITHUB_PRIVATE` + пустой токен — тоже не вешаются. Плагин токен не передаёт.
 
 ### Шаг 8. Подключить библиотеку к одному тестовому плагину
 
@@ -423,6 +438,6 @@ WordPress Updater
 
 ## Текущая точка продолжения
 
-Доменные объекты и `GitHubProvider` есть. Credentials для v1 — GitHub PAT через `ART_UPDATER_GITHUB_TOKEN`.
+Доменные объекты, `GitHubProvider` и `PluginUpdater` есть.
 
-Следующий этап — интеграция WordPress (хуки updater и скачивание приватного ZIP).
+Следующий этап — подключить библиотеку к одному тестовому плагину и пройти цикл обновления.
