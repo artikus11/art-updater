@@ -64,7 +64,7 @@ Runner уже генерирует этот файл и дублирует asset
 - **Конфиг.** Все константы в `Art\Updater\Config`: имена `AUP_*`, `METADATA_ASSET`, GitHub API, кеш, коды `WP_Error`.
 - **Credentials.** GitHub PAT через `AUP_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим; без репозитория или `AUP_GITHUB_PRIVATE` без токена — updater молчит.
 - **Metadata.** Контракт v1 — `update-metadata.json` в assets Release. Полный snapshot, без `requires` / `tested` / `changelog`.
-- **Версии пакета.** Git tag, constraint в плагинах `^1.0`. `1.x` не ломает `PluginUpdater(__FILE__)`, `AUP_*` и интерфейс provider. Мажор — только вместе с бампом `Version` всех плагинов, которые вендорят либу.
+- **Версии пакета.** Git tag (сейчас `1.0.0`), в плагинах `^1.0`. Коммит тег не пушит. `1.x` не ломает `PluginUpdater(__FILE__)`, `AUP_*` и интерфейс provider. Мажор — только вместе с бампом `Version` всех плагинов, которые вендорят либу.
 
 Не выбрано:
 
@@ -107,9 +107,9 @@ define( 'AUP_GITHUB_PRIVATE', true ); // опционально
 }
 ```
 
-Packagist не нужен. Версия пакета — git tag в этом репозитории, не поле `version` в `composer.json` и не `dev-master`.
+Packagist не нужен. Версия пакета — git tag в этом репозитории, не поле `version` в `composer.json` и не `dev-master`. Коммит тег не создаёт: выпуск это `git tag 1.0.1` и `git push origin 1.0.1`. Пока тег не на GitHub, `^1.0` не резолвится. Не каждый коммит — новый тег. Текущий релиз: `1.0.0`.
 
-В линейке `1.x` не меняются: `new PluginUpdater( __FILE__ )`, имена `AUP_*`, `UpdateProviderInterface`. Ломающий API — тег `2.0.0`. Тогда в одном общем Release поднимают `Version` **всех** плагинов, которые вендорят updater: на сайте не должно оказаться двух мажоров одного класса `Art\Updater\…`.
+В линейке `1.x` не меняются: `new PluginUpdater( __FILE__ )`, имена `AUP_*`, `UpdateProviderInterface`. Ломающий API — тег `2.0.0`. Тогда в одном общем Release поднимают `Version` **всех** плагинов, которые вендорят updater: на сайте не должно оказаться двух мажоров одного класса `Art\Updater\…`. Версию в код не копировать; какая либа в ZIP — `composer.lock`.
 
 Главный файл плагина:
 
@@ -170,7 +170,7 @@ UpdateProviderInterface
 - `PluginUpdater`: хуки WP, авторизованное скачивание GitHub asset, путь после установки = slug.
 - Живой цикл обновления на тестовом плагине.
 - Новый общий Release при неизменной `Version` плагина → обновления нет.
-- SemVer через git tag, в плагинах `^1.0`, не `dev-master`.
+- SemVer через git tag (`1.0.0`), в плагинах `^1.0`, не `dev-master`. Тег публикуется отдельно от коммита.
 - Передаточный статус в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ### Позже
