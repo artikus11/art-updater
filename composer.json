@@ -3,7 +3,6 @@
     "description": "Updater for WordPress and WooCommerce projects",
     "type": "library",
     "license": "MIT",
-    "version": "1.0.0",
     "autoload": {
         "psr-4": {
             "Art\\Updater\\": "src/php/"
