@@ -16,6 +16,24 @@ Credentials для v1: GitHub PAT в конфиге сайта (`AUP_GITHUB_TOKE
 репозитория токен не обязателен; для приватного без константы updater не стартует. Ротация на парке сайтов — шаг
 развёртывания, не gateway и не синхронизация секретов. GitHub App / gateway можно добавить позже без смены API плагинов.
 
+## Changelog
+
+### 1.1.0
+
+Следующий git tag. На GitHub пока `1.0.0`; без нового тега `^1.0` эти методы не подтянутся.
+
+- `Art\Updater\Snapshot`: ключи metadata по slug, поля `release` и `generated_at` (дата генерации релиза, не коммит файла плагина)
+- `GitHubProvider::from_site()` — те же `AUP_*`, что у `PluginUpdater`
+- `GitHubProvider::get_remote()` — `Update` из snapshot без фильтра «только новее»
+- `GitHubProvider::get_snapshot()` / `clear_cache()` — публичный snapshot и сброс transient `aup_gh_*`
+- `get_update()` не менялся: `null`, если remote не новее
+- в кеш кладутся `plugins`, `assets`, `release`, `generated_at`
+- `Config::constant_string()`, `Config::is_github_private()`; `PluginUpdater` создаёт провайдер через `from_site()`
+
+### 1.0.0
+
+- штатный updater: GitHub Release → `update-metadata.json` → хуки WP → скачивание ZIP
+
 ## Источник обновлений
 
 Несколько плагинов живут в одном закрытом GitHub-репозитории. Каждый прогон workflow создаёт **один** Release на весь набор, не отдельный release на плагин.
@@ -59,7 +77,7 @@ Runner уже генерирует этот файл и дублирует asset
 - **Slug.** Дополнительный `asset_name` не нужен. `plugin_basename(__FILE__)` → первая часть пути: `skl-core/skl-core.php` → `skl-core` → `skl-core.zip`.
 - **Версия.** Сравнивается установленный `Version` с записью в metadata, не с GitHub tag.
 - **Provider.** WordPress-слой и источник данных разделены. GitHub-структуры не протекают в updater. Provider отдаёт нормализованный `Update`.
-- **Домен.** `readonly` `Plugin` и `Update`, `UpdateProviderInterface` в `src/php/`. PHP `>=8.3`.
+- **Домен.** `readonly` `Plugin`, `Update`, `Snapshot`; `UpdateProviderInterface` в `src/php/`. PHP `>=8.3`.
 - **Регистрация.** Только `__FILE__`. Slug, basename и `Version` читаются из файла, не из массива в вызове.
 - **Конфиг.** Все константы в `Art\Updater\Config`: имена `AUP_*`, `METADATA_ASSET`, GitHub API, кеш, коды `WP_Error`.
 - **Credentials.** GitHub PAT через `AUP_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим; без репозитория или `AUP_GITHUB_PRIVATE` без токена — updater молчит.
@@ -144,6 +162,22 @@ UpdateProviderInterface
 
 `GitHubProvider` берёт `owner/repo` и опциональный tag из констант сайта. Для skladchina tag — `skl-plugins-latest`, потому что `make_latest: false`.
 
+`UpdateProviderInterface::get_update()` по-прежнему `null`, если remote не новее установленной. Для таблицы версий (Skl Core) не этот метод:
+
+```php
+$provider = \Art\Updater\GitHubProvider::from_site();
+
+if ( null === $provider ) {
+    // нет AUP_GITHUB_REPOSITORY или приват без токена
+}
+
+$snapshot = $provider->get_snapshot(); // все slug из metadata, release, generated_at
+$remote   = $provider->get_remote( new \Art\Updater\Plugin( 'skl-core', '1.6.0', 'skl-core/skl-core.php' ) );
+$provider->clear_cache(); // сброс transient aup_gh_*
+```
+
+`get_remote()` отдаёт `Update` и при равных версиях. `from_site()` — те же правила готовности, что у `PluginUpdater`. Snapshot и апдейты делят один кеш: один fetch metadata на набор плагинов.
+
 Хуки WordPress:
 
 - `pre_set_site_transient_update_plugins`
@@ -167,6 +201,7 @@ UpdateProviderInterface
 - Константы в `Art\Updater\Config`, префикс сайта `AUP_`.
 - Доменные объекты: `readonly` `Plugin` и `Update`, `UpdateProviderInterface`.
 - `GitHubProvider`: Release → `update-metadata.json` → slug → `Update`; кеш transient; `package_url` = API URL asset.
+- `get_remote()`, `get_snapshot()`, `clear_cache()`, `from_site()` для статуса версий без смены `get_update()`.
 - `PluginUpdater`: хуки WP, авторизованное скачивание GitHub asset, путь после установки = slug.
 - Живой цикл обновления на тестовом плагине.
 - Новый общий Release при неизменной `Version` плагина → обновления нет.
@@ -177,7 +212,7 @@ UpdateProviderInterface
 
 1. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
 
-Сейчас GitHub-updater 1.x закрыт. Следующее крупное — gateway, когда понадобится.
+Следующее в skladchinaorg — вкладка версий в `skl-core` на этом API. Gateway — когда понадобится свой endpoint вместо GitHub.
 
 ## Открытые вопросы
 

@@ -150,7 +150,7 @@ Provider должен преобразовывать источник данны
 - `package_url` — URL скачивания, его заполняет provider;
 - `changelog`, `requires`, `tested`, `updated_at` — опциональны; в metadata v1 есть только `updated_at`.
 
-Доменные объекты лежат в `src/php/` (`Art\Updater\`): `Plugin`, `Update`, `UpdateProviderInterface`. GitHub-структуры в них не входят.
+Доменные объекты лежат в `src/php/` (`Art\Updater\`): `Plugin`, `Update`, `Snapshot`, `UpdateProviderInterface`. GitHub-структуры в них не входят.
 
 ### 6. Регистрация плагинов
 
@@ -261,6 +261,7 @@ define( 'AUP_GITHUB_PRIVATE', true ); // optional; if true, empty token disables
 
 - `composer.json` — пакет `art/updater`, PHP `>=8.3`, версия через git tag, PSR-4 `Art\\Updater\\` → `src/php/`
 - `phpcs.xml` — `testVersion` 8.3-
+- `src/php/Snapshot.php`
 - `src/php/Config.php`
 - `src/php/Update.php`
 - `src/php/UpdateProviderInterface.php`
@@ -292,7 +293,7 @@ Workflow репозитория плагинов не менялся.
 
 ## Известные проблемы / открытые вопросы
 
-Нет. `GatewayProvider` — следующая крупная задача, не открытый вопрос v1.
+Нет открытых дыр для штатного апдейта. Вкладка версий в Core ждала публичный snapshot без `is_newer_than` — сделано (22.08.2026). `GatewayProvider` — следующая крупная задача, не открытый вопрос v1.
 
 ## Опробованные, но не выбранные подходы
 
@@ -374,12 +375,22 @@ API.
 ```text
 Art\Updater\Plugin
 Art\Updater\Update
+Art\Updater\Snapshot
 Art\Updater\UpdateProviderInterface
 ```
 
 `Plugin` и `Update` — `readonly` class. `Plugin`: slug, установленная версия, plugin basename (`skl-core/skl-core.php`).
 `Update`: version, package, package_url, опционально changelog / requires / tested / updated_at.
 `UpdateProviderInterface::get_update( Plugin ): ?Update` — `null`, если плагина нет в источнике или версия не новее.
+
+Для статуса «текущая / актуальная» (вкладка в Skl Core) этого недостаточно: при равных версиях `get_update()` тоже `null`. Интерфейс не расширяли. На `GitHubProvider`:
+
+- `from_site(): ?self` — те же `AUP_*`, что у `PluginUpdater`;
+- `get_remote( Plugin ): ?Update` — запись из snapshot без `is_newer_than`;
+- `get_snapshot(): ?Snapshot` — все slug, `release`, `generated_at`;
+- `clear_cache(): bool` — `delete_transient` по тому же ключу, что чтение.
+
+`PluginUpdater` создаёт провайдер через `GitHubProvider::from_site()`. Fetch metadata один на набор, кеш общий.
 
 GitHub response внутрь этих типов не протаскивается.
 
@@ -393,7 +404,7 @@ new GitHubProvider( 'owner/repo', 'skl-plugins-latest' );
 
 Пустой второй аргумент → `GET /releases/latest`. Для skladchina `make_latest: false`, нужен tag alias (`skl-plugins-latest`).
 
-Поведение: Release → asset `update-metadata.json` → запись по slug → `version_compare` → `Update` с `package_url` = GitHub API URL asset (`Accept: application/octet-stream`). Токен из `AUP_GITHUB_TOKEN` (Bearer), если задан. Ответ кешируется transient'ом (успех 6 часов, ошибка 15 минут, фильтр `aup_github_cache_ttl`).
+Поведение: Release → asset `update-metadata.json` → запись по slug. `get_update()` делает `version_compare` и отдаёт `Update` только если remote новее. `get_remote()` / `get_snapshot()` — тот же snapshot без фильтра версии. `package_url` = GitHub API URL asset (`Accept: application/octet-stream`). Токен из `AUP_GITHUB_TOKEN` (Bearer), если задан. Ответ кешируется transient'ом (успех 6 часов, ошибка 15 минут, фильтр `aup_github_cache_ttl`). В кеш кладутся `plugins`, `assets`, `release`, `generated_at`.
 
 Скачивание ZIP через `Plugin_Upgrader` ещё не подключено: URL уже нормализован, заголовок авторизации на download — шаг WP-интеграции.
 
@@ -425,7 +436,11 @@ new GitHubProvider( 'owner/repo', 'skl-plugins-latest' );
 
 Сделано. Новый общий Release, `Version` конкретного плагина не менялась → обновления для него нет.
 
-### Шаг 10. Добавить GatewayProvider позже
+### Шаг 10. Snapshot API для статуса версий
+
+Сделано 22.08.2026. Интерфейс `get_update()` не менялся. `Art\Updater\Snapshot`, методы `GitHubProvider::from_site()`, `get_remote()`, `get_snapshot()`, `clear_cache()`. Metadata `release` и `generated_at` попадают в кеш.
+
+### Шаг 11. Добавить GatewayProvider позже
 
 После стабилизации GitHub implementation:
 
@@ -444,6 +459,8 @@ WordPress Updater
 
 ## Текущая точка продолжения
 
-Стратегия версий `1.x` зафиксирована: git tag, в плагинах `^1.0`. GitHub-цикл закрыт.
+`get_remote` / `get_snapshot` / `clear_cache` закрывают блокер вкладки версий в `skl-core`. Следующий шаг — не в этом репо: сервис и вкладка в Core.
 
-Следующее крупное изменение — `GatewayProvider`, когда понадобится.
+Тег `1.1.0` публиковать отдельно, когда пакет можно брать в плагины. Без нового тега `^1.0` на GitHub останется `1.0.0` без этих методов.
+
+`GatewayProvider` — следующая крупная задача библиотеки, когда понадобится свой endpoint.
