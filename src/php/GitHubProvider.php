@@ -14,14 +14,107 @@ final class GitHubProvider implements UpdateProviderInterface {
 		$this->release_tag = $release_tag;
 	}
 
-	public function get_update( Plugin $plugin ): ?Update {
-		$snapshot = $this->get_snapshot();
+	public static function from_site(): ?self {
+		$repository = Config::constant_string( Config::GITHUB_REPOSITORY );
 
-		if ( null === $snapshot ) {
+		if ( '' === $repository ) {
 			return null;
 		}
 
-		$slug  = $plugin->get_slug();
+		if ( Config::is_github_private() && '' === Config::constant_string( Config::GITHUB_TOKEN ) ) {
+			return null;
+		}
+
+		return new self(
+			$repository,
+			Config::constant_string( Config::GITHUB_RELEASE_TAG )
+		);
+	}
+
+	public function get_update( Plugin $plugin ): ?Update {
+		$update = $this->get_remote( $plugin );
+
+		if ( null === $update || ! $update->is_newer_than( $plugin ) ) {
+			return null;
+		}
+
+		return $update;
+	}
+
+	public function get_remote( Plugin $plugin ): ?Update {
+		$raw = $this->load_snapshot();
+
+		if ( null === $raw ) {
+			return null;
+		}
+
+		return $this->update_from_snapshot( $plugin->get_slug(), $raw );
+	}
+
+	public function get_snapshot(): ?Snapshot {
+		$raw = $this->load_snapshot();
+
+		if ( null === $raw ) {
+			return null;
+		}
+
+		$release      = isset( $raw['release'] ) && is_string( $raw['release'] ) ? $raw['release'] : null;
+		$generated_at = isset( $raw['generated_at'] ) && is_string( $raw['generated_at'] ) ? $raw['generated_at'] : null;
+
+		return new Snapshot( $raw['plugins'], $release, $generated_at );
+	}
+
+	public function clear_cache(): bool {
+		return delete_transient( $this->cache_key() );
+	}
+
+	/**
+	 * @return array{plugins: array<string, array<string, mixed>>, assets: array<string, string>, release?: string|null, generated_at?: string|null}|null
+	 */
+	private function load_snapshot(): ?array {
+		if ( ! $this->is_repository_valid() ) {
+			return null;
+		}
+
+		$cache_key = $this->cache_key();
+		$cached    = get_transient( $cache_key );
+
+		if ( is_array( $cached ) ) {
+			if ( ! empty( $cached['_failed'] ) ) {
+				return null;
+			}
+
+			if ( $this->is_snapshot_payload( $cached ) ) {
+				return $cached;
+			}
+		}
+
+		$snapshot = $this->fetch_snapshot();
+		$ttl      = $this->cache_ttl( null !== $snapshot );
+
+		set_transient(
+			$cache_key,
+			null !== $snapshot ? $snapshot : [ '_failed' => true ],
+			$ttl
+		);
+
+		return $snapshot;
+	}
+
+	/**
+	 * @param array<string, mixed> $payload
+	 */
+	private function is_snapshot_payload( array $payload ): bool {
+		return isset( $payload['plugins'], $payload['assets'] )
+			&& is_array( $payload['plugins'] )
+			&& is_array( $payload['assets'] );
+	}
+
+	/**
+	 * @param string                                                                            $slug
+	 * @param array{plugins: array<string, array<string, mixed>>, assets: array<string, string>} $snapshot
+	 */
+	private function update_from_snapshot( string $slug, array $snapshot ): ?Update {
 		$entry = isset( $snapshot['plugins'][ $slug ] ) && is_array( $snapshot['plugins'][ $slug ] )
 			? $snapshot['plugins'][ $slug ]
 			: null;
@@ -41,50 +134,11 @@ final class GitHubProvider implements UpdateProviderInterface {
 			return null;
 		}
 
-		$update = new Update( $version, $package, $package_url, null, null, null, $updated_at );
-
-		if ( ! $update->is_newer_than( $plugin ) ) {
-			return null;
-		}
-
-		return $update;
+		return new Update( $version, $package, $package_url, null, null, null, $updated_at );
 	}
 
 	/**
-	 * @return array{plugins: array<string, array<string, mixed>>, assets: array<string, string>}|null
-	 */
-	private function get_snapshot(): ?array {
-		if ( ! $this->is_repository_valid() ) {
-			return null;
-		}
-
-		$cache_key = $this->cache_key();
-		$cached    = get_transient( $cache_key );
-
-		if ( is_array( $cached ) ) {
-			if ( ! empty( $cached['_failed'] ) ) {
-				return null;
-			}
-
-			if ( isset( $cached['plugins'], $cached['assets'] ) && is_array( $cached['plugins'] ) && is_array( $cached['assets'] ) ) {
-				return $cached;
-			}
-		}
-
-		$snapshot = $this->fetch_snapshot();
-		$ttl      = $this->cache_ttl( null !== $snapshot );
-
-		set_transient(
-			$cache_key,
-			null !== $snapshot ? $snapshot : [ '_failed' => true ],
-			$ttl
-		);
-
-		return $snapshot;
-	}
-
-	/**
-	 * @return array{plugins: array<string, array<string, mixed>>, assets: array<string, string>}|null
+	 * @return array{plugins: array<string, array<string, mixed>>, assets: array<string, string>, release: string|null, generated_at: string|null}|null
 	 */
 	private function fetch_snapshot(): ?array {
 		$release = $this->request_json( $this->release_url() );
@@ -131,9 +185,14 @@ final class GitHubProvider implements UpdateProviderInterface {
 			return null;
 		}
 
+		$release_id   = isset( $metadata['release'] ) && is_string( $metadata['release'] ) ? $metadata['release'] : null;
+		$generated_at = isset( $metadata['generated_at'] ) && is_string( $metadata['generated_at'] ) ? $metadata['generated_at'] : null;
+
 		return [
-			'plugins' => $metadata['plugins'],
-			'assets'  => $assets,
+			'plugins'      => $metadata['plugins'],
+			'assets'       => $assets,
+			'release'      => $release_id,
+			'generated_at' => $generated_at,
 		];
 	}
 
@@ -178,7 +237,7 @@ final class GitHubProvider implements UpdateProviderInterface {
 	private function request( string $url, array $headers ): ?string {
 		$headers['User-Agent'] = 'art-updater';
 
-		$token = $this->get_token();
+		$token = Config::constant_string( Config::GITHUB_TOKEN );
 
 		if ( '' !== $token ) {
 			$headers['Authorization'] = 'Bearer ' . $token;
@@ -206,16 +265,6 @@ final class GitHubProvider implements UpdateProviderInterface {
 		$body = wp_remote_retrieve_body( $response );
 
 		return is_string( $body ) && '' !== $body ? $body : null;
-	}
-
-	private function get_token(): string {
-		if ( ! defined( Config::GITHUB_TOKEN ) ) {
-			return '';
-		}
-
-		$token = constant( Config::GITHUB_TOKEN );
-
-		return is_string( $token ) ? trim( $token ) : '';
 	}
 
 	private function is_repository_valid(): bool {

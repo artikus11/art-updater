@@ -21,4 +21,18 @@ final class Config {
 	public const string ERROR_TMP      = 'aup_tmp';
 	public const string ERROR_REDIRECT = 'aup_redirect';
 	public const string ERROR_DOWNLOAD = 'aup_download';
+
+	public static function constant_string( string $name ): string {
+		if ( ! defined( $name ) ) {
+			return '';
+		}
+
+		$value = constant( $name );
+
+		return is_string( $value ) ? trim( $value ) : '';
+	}
+
+	public static function is_github_private(): bool {
+		return defined( self::GITHUB_PRIVATE ) && (bool) constant( self::GITHUB_PRIVATE );
+	}
 }

@@ -174,23 +174,7 @@ final class PluginUpdater {
 	}
 
 	private function make_github_provider(): ?GitHubProvider {
-		$repository = $this->constant_string( Config::GITHUB_REPOSITORY );
-
-		if ( '' === $repository ) {
-			return null;
-		}
-
-		$private = defined( Config::GITHUB_PRIVATE ) && constant( Config::GITHUB_PRIVATE );
-		$token   = $this->constant_string( Config::GITHUB_TOKEN );
-
-		if ( $private && '' === $token ) {
-			return null;
-		}
-
-		return new GitHubProvider(
-			$repository,
-			$this->constant_string( Config::GITHUB_RELEASE_TAG )
-		);
+		return GitHubProvider::from_site();
 	}
 
 	/**
@@ -327,7 +311,7 @@ final class PluginUpdater {
 
 		if ( $authorize && $this->is_github_asset_url( $url ) ) {
 			$headers['Accept'] = 'application/octet-stream';
-			$token             = $this->constant_string( Config::GITHUB_TOKEN );
+			$token             = Config::constant_string( Config::GITHUB_TOKEN );
 
 			if ( '' !== $token ) {
 				$headers['Authorization'] = 'Bearer ' . $token;
@@ -344,15 +328,5 @@ final class PluginUpdater {
 				'filename'    => $filename,
 			]
 		);
-	}
-
-	private function constant_string( string $name ): string {
-		if ( ! defined( $name ) ) {
-			return '';
-		}
-
-		$value = constant( $name );
-
-		return is_string( $value ) ? trim( $value ) : '';
 	}
 }
