@@ -10,7 +10,7 @@ Composer-библиотека штатных обновлений WordPress-пл
 
 ## Статус
 
-Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater` (PHP `>=8.3`), доменные объекты, `GitHubProvider` и `PluginUpdater`. Цикл на живом WordPress ещё не прогоняли.
+Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater` (PHP `>=8.3`), доменные объекты, `GitHubProvider` и `PluginUpdater`. На живом плагине прошли обновление и сценарий «новый Release, версия та же → обновления нет».
 
 Credentials для v1: GitHub PAT в конфиге сайта (`AUP_GITHUB_TOKEN`). Плагин токен не получает. Для публичного
 репозитория токен не обязателен; для приватного без константы updater не стартует. Ротация на парке сайтов — шаг
@@ -64,10 +64,12 @@ Runner уже генерирует этот файл и дублирует asset
 - **Конфиг.** Все константы в `Art\Updater\Config`: имена `AUP_*`, `METADATA_ASSET`, GitHub API, кеш, коды `WP_Error`.
 - **Credentials.** GitHub PAT через `AUP_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим; без репозитория или `AUP_GITHUB_PRIVATE` без токена — updater молчит.
 - **Metadata.** Контракт v1 — `update-metadata.json` в assets Release. Полный snapshot, без `requires` / `tested` / `changelog`.
+- **Версии пакета.** Git tag, constraint в плагинах `^1.0`. `1.x` не ломает `PluginUpdater(__FILE__)`, `AUP_*` и интерфейс provider. Мажор — только вместе с бампом `Version` всех плагинов, которые вендорят либу.
 
 Не выбрано:
 
 - массив slug/version в конструктор вместо `__FILE__`;
+- `dev-master` как долговременный пин версии либы;
 - token в каждом плагине или в его настройках;
 - рантайм-синхронизация токена между сайтами;
 - GitHub App или gateway как способ ротации PAT в v1;
@@ -92,6 +94,12 @@ define( 'AUP_GITHUB_PRIVATE', true ); // опционально
 
 ```json
 {
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/artikus11/art-updater.git"
+    }
+  ],
   "require": {
     "php": ">=8.3",
     "art/updater": "^1.0"
@@ -99,7 +107,9 @@ define( 'AUP_GITHUB_PRIVATE', true ); // опционально
 }
 ```
 
-Репозиторий пакета подключается как Composer VCS, Packagist не обязателен.
+Packagist не нужен. Версия пакета — git tag в этом репозитории, не поле `version` в `composer.json` и не `dev-master`.
+
+В линейке `1.x` не меняются: `new PluginUpdater( __FILE__ )`, имена `AUP_*`, `UpdateProviderInterface`. Ломающий API — тег `2.0.0`. Тогда в одном общем Release поднимают `Version` **всех** плагинов, которые вендорят updater: на сайте не должно оказаться двух мажоров одного класса `Art\Updater\…`.
 
 Главный файл плагина:
 
@@ -158,21 +168,17 @@ UpdateProviderInterface
 - Доменные объекты: `readonly` `Plugin` и `Update`, `UpdateProviderInterface`.
 - `GitHubProvider`: Release → `update-metadata.json` → slug → `Update`; кеш transient; `package_url` = API URL asset.
 - `PluginUpdater`: хуки WP, авторизованное скачивание GitHub asset, путь после установки = slug.
+- Живой цикл обновления на тестовом плагине.
+- Новый общий Release при неизменной `Version` плагина → обновления нет.
+- SemVer через git tag, в плагинах `^1.0`, не `dev-master`.
 - Передаточный статус в [PROJECT_STATUS.md](PROJECT_STATUS.md).
-
-### Дальше
-
-1. Подключить к одному тестовому плагину и пройти цикл обновления.
-2. Сценарий «новый Release, версия плагина та же → обновления нет».
 
 ### Позже
 
-3. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
+1. `GatewayProvider` за тем же `UpdateProviderInterface`. API плагинов не меняется.
 
-Сейчас следующий шаг — проверка на тестовом плагине.
+Сейчас GitHub-updater 1.x закрыт. Следующее крупное — gateway, когда понадобится.
 
 ## Открытые вопросы
 
-1. Цикл обновления на живом WordPress (админка, ZIP, путь после `Plugin_Upgrader`).
-2. Сценарий стабильной версии при новом общем Release.
-3. Совместимость версий самой updater-библиотеки.
+Нет.
