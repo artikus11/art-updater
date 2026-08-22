@@ -10,7 +10,7 @@ Composer-библиотека штатных обновлений WordPress-пл
 
 ## Статус
 
-Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater` (PHP `>=8.3`), доменные объекты, `GitHubProvider` и `PluginUpdater`. На живом плагине прошли обновление и сценарий «новый Release, версия та же → обновления нет».
+Проектирование закрыто по credentials и metadata. Есть Composer-пакет `art/updater` (PHP `>=8.3`), доменные объекты, `GitHubProvider` и `PluginUpdater`. PHPUnit-тестов в либе нет: проверка — живой WordPress (обновление и стабильная версия). Хуки WP и скачивание GitHub не мокаем. Dev-зависимости — только PHPCS / WPCS / PHPCompatibility.
 
 Credentials для v1: GitHub PAT в конфиге сайта (`AUP_GITHUB_TOKEN`). Плагин токен не получает. Для публичного
 репозитория токен не обязателен; для приватного без константы updater не стартует. Ротация на парке сайтов — шаг
@@ -18,9 +18,13 @@ Credentials для v1: GitHub PAT в конфиге сайта (`AUP_GITHUB_TOKE
 
 ## Changelog
 
-### 1.1.0
+### 1.1.1
 
-Следующий git tag. На GitHub пока `1.0.0`; без нового тега `^1.0` эти методы не подтянутся.
+- из dev-зависимостей убраны PHPUnit, WP_Mock, Mockery, function-mocker
+- проверка updater — живой WordPress, не юнит-тесты
+- PHPCS / WPCS / PHPCompatibility остаются
+
+### 1.1.0
 
 - `Art\Updater\Snapshot`: ключи metadata по slug, поля `release` и `generated_at` (дата генерации релиза, не коммит файла плагина)
 - `GitHubProvider::from_site()` — те же `AUP_*`, что у `PluginUpdater`
@@ -82,7 +86,8 @@ Runner уже генерирует этот файл и дублирует asset
 - **Конфиг.** Все константы в `Art\Updater\Config`: имена `AUP_*`, `METADATA_ASSET`, GitHub API, кеш, коды `WP_Error`.
 - **Credentials.** GitHub PAT через `AUP_GITHUB_TOKEN` на сайте, не в плагине и не в `wp_options`. Один PAT не означает доступ к любому чужому приватному репо. Готовность источника — при инициализации: публичный GitHub без токена допустим; без репозитория или `AUP_GITHUB_PRIVATE` без токена — updater молчит.
 - **Metadata.** Контракт v1 — `update-metadata.json` в assets Release. Полный snapshot, без `requires` / `tested` / `changelog`.
-- **Версии пакета.** Git tag (сейчас `1.0.0`), в плагинах `^1.0`. Коммит тег не пушит. `1.x` не ломает `PluginUpdater(__FILE__)`, `AUP_*` и интерфейс provider. Мажор — только вместе с бампом `Version` всех плагинов, которые вендорят либу.
+- **Версии пакета.** Git tag (сейчас `1.1.1`), в плагинах `^1.0`. Коммит тег не пушит. `1.x` не ломает `PluginUpdater(__FILE__)`, `AUP_*` и интерфейс provider. Мажор — только вместе с бампом `Version` всех плагинов, которые вендорят либу.
+- **Проверка.** PHPUnit-тестов в либе нет. Живой WordPress: обновление и сценарий стабильной версии. Хуки updater и скачивание GitHub не мокаем. Dev-зависимости — PHPCS, WPCS, PHPCompatibility.
 
 Не выбрано:
 
@@ -125,7 +130,7 @@ define( 'AUP_GITHUB_PRIVATE', true ); // опционально
 }
 ```
 
-Packagist не нужен. Версия пакета — git tag в этом репозитории, не поле `version` в `composer.json` и не `dev-master`. Коммит тег не создаёт: выпуск это `git tag 1.0.1` и `git push origin 1.0.1`. Пока тег не на GitHub, `^1.0` не резолвится. Не каждый коммит — новый тег. Текущий релиз: `1.0.0`.
+Packagist не нужен. Версия пакета — git tag в этом репозитории, не поле `version` в `composer.json` и не `dev-master`. Коммит тег не создаёт: выпуск это `git tag 1.0.1` и `git push origin 1.0.1`. Пока тег не на GitHub, `^1.0` не резолвится. Не каждый коммит — новый тег. Текущий релиз: `1.1.1`.
 
 В линейке `1.x` не меняются: `new PluginUpdater( __FILE__ )`, имена `AUP_*`, `UpdateProviderInterface`. Ломающий API — тег `2.0.0`. Тогда в одном общем Release поднимают `Version` **всех** плагинов, которые вендорят updater: на сайте не должно оказаться двух мажоров одного класса `Art\Updater\…`. Версию в код не копировать; какая либа в ZIP — `composer.lock`.
 
@@ -205,7 +210,8 @@ $provider->clear_cache(); // сброс transient aup_gh_*
 - `PluginUpdater`: хуки WP, авторизованное скачивание GitHub asset, путь после установки = slug.
 - Живой цикл обновления на тестовом плагине.
 - Новый общий Release при неизменной `Version` плагина → обновления нет.
-- SemVer через git tag (`1.0.0`), в плагинах `^1.0`, не `dev-master`. Тег публикуется отдельно от коммита.
+- SemVer через git tag (`1.1.1`), в плагинах `^1.0`, не `dev-master`. Тег публикуется отдельно от коммита.
+- PHPUnit в либе нет; проверка на живом WP. Dev — PHPCS/WPCS/PHPCompatibility.
 - Передаточный статус в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ### Позже

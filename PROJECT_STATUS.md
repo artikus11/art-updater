@@ -174,7 +174,9 @@ new PluginUpdater(
 
 ### 7. Composer
 
-Пакет: `art/updater`. PHP `>=8.3`. Подключается как Composer VCS с GitHub, Packagist не нужен. Версия — git tag (`1.0.0`, …), в плагине constraint `^1.0`, не `dev-master` и не поле `version` в `composer.json` пакета.
+Пакет: `art/updater`. PHP `>=8.3`. Подключается как Composer VCS с GitHub, Packagist не нужен. Версия — git tag (`1.1.1`, …), в плагине constraint `^1.0`, не `dev-master` и не поле `version` в `composer.json` пакета.
+
+Require-dev только PHPCS, WPCS, PHPCompatibility. PHPUnit в либе нет.
 
 Все константы библиотеки (имена `define` с префиксом `AUP_`, `METADATA_ASSET`, GitHub API, кеш, коды ошибок) живут в `Art\Updater\Config`.
 
@@ -194,7 +196,7 @@ composer install --no-dev --optimize-autoloader
 - Коммит сам тег не создаёт и не публикует. Тег — отдельный шаг, когда пакет можно брать в плагины.
 - Не каждый коммит = новая версия. Правка доков или опечатка не обязана становиться `1.0.1`.
 - Выпуск: коммит → `git tag 1.0.1` (или `1.1.0` / `2.0.0`) → `git push` и `git push origin 1.0.1` (или `--tags`). Пока тег не на GitHub, `"art/updater": "^1.0"` с VCS не резолвится.
-- Актуальный релиз линейки `1.x`: тег `1.0.0`.
+- Актуальный релиз линейки `1.x`: тег `1.1.1`.
 - Плагины требуют `"art/updater": "^1.0"`.
 - В `1.x` стабильны: `new PluginUpdater( __FILE__ )`, константы `AUP_*`, `UpdateProviderInterface`.
 - Ломающий API = тег `2.0.0` и в том же общем Release новый `Version` у всех плагинов с этой либой. Смесь мажоров на одном сайте не поддерживается.
@@ -260,7 +262,7 @@ define( 'AUP_GITHUB_PRIVATE', true ); // optional; if true, empty token disables
 ## Изменённые основные файлы
 
 - `composer.json` — пакет `art/updater`, PHP `>=8.3`, версия через git tag, PSR-4 `Art\\Updater\\` → `src/php/`
-- `phpcs.xml` — `testVersion` 8.3-
+- `phpunit.xml.dist` удалён; PHPUnit/WP_Mock/Mockery не используются
 - `src/php/Snapshot.php`
 - `src/php/Config.php`
 - `src/php/Update.php`
@@ -278,6 +280,8 @@ Workflow репозитория плагинов не менялся.
 
 - полный цикл обновления тестового плагина (обнаружение, ZIP, установка);
 - новый общий Release при неизменной `Version` плагина → обновления нет.
+
+PHPUnit-тестов в репозитории нет. Хуки WordPress и скачивание GitHub не покрываем моками. Dev-зависимости: PHPCS, WPCS, PHPCompatibility.
 
 `PluginUpdater` регистрирует хуки штатного updater. Код на PHP 8.3: typed properties, `readonly` у `Plugin`/`Update`, union types, typed class constants в `Config`. phpcs по `src/php/` проходит.
 
@@ -461,6 +465,4 @@ WordPress Updater
 
 `get_remote` / `get_snapshot` / `clear_cache` закрывают блокер вкладки версий в `skl-core`. Следующий шаг — не в этом репо: сервис и вкладка в Core.
 
-Тег `1.1.0` публиковать отдельно, когда пакет можно брать в плагины. Без нового тега `^1.0` на GitHub останется `1.0.0` без этих методов.
-
-`GatewayProvider` — следующая крупная задача библиотеки, когда понадобится свой endpoint.
+Тег `1.1.1` — phpcs-only dev, без PHPUnit. `GatewayProvider` — следующая крупная задача библиотеки, когда понадобится свой endpoint.
